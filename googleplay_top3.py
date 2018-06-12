@@ -62,7 +62,7 @@ LOGGING = {
 mongo_client = pymongo.MongoClient('18.8.8.209')
 cy = mongo_client.cy
 
-cy_category = pd.DataFrame(list(cy.cy_cato.find(projection={'_id': False, 'id': False})))
+cy_category = pd.DataFrame(list(cy.cy_cato.find(projection={'_id': False})))
 
 
 google_play_url = "https://play.google.com"
@@ -100,6 +100,8 @@ def get_category(app):
 
     if category is not None:
         app['category'] = category['category']
+        app['cy_category'] = category['cy_category']
+        app['category_id'] = category['category_id']
         my_logger.debug('{}:got it from database'.format(app['package_name']))
         return True
     else:
@@ -118,6 +120,8 @@ def get_category(app):
             if response.status_code == 404:
                 #set default value:
                 app['category'] = 'TOOLS'
+                app['cy_category'] = 'Tools'
+                app['category_id'] = 1
         else:
             soup = BeautifulSoup(response.text, "lxml")
             hrefs = soup.find_all('a')
@@ -125,6 +129,14 @@ def get_category(app):
                 try:
                     if href.get('itemprop')  == 'genre':
                         app['category'] = href['href'].split('/')[-1]
+                        try:
+                            app['cy_category'] = cy_category[cy_category['category'] == app['category']]['title'].values[0]
+                            app['category_id'] = int(cy_category[cy_category['category'] == app['category']]['id'].values[0])
+                        except IndexError:
+                            my_logger.error('{}:category {} not found in cy category'.format(
+                                app['package_name'], app['category']))
+                            app['cy_category'] = 'Tools'
+                            app['category_id'] = 1
                         my_logger.debug('{}: get category from google play succuessfully'.format(app['package_name']))
                         return True
                 except:
@@ -140,7 +152,7 @@ def get_topapps(country):
     my_logger.debug("starting get topapps for country:[{}] at {}".format(country,now))
     
     querystring = {"market": "google-play", "country_code": country, "category": "1",
-                   "date": now, "rank_sorting_type": "rank", "page_size": "300", "order_type": "desc"}
+                   "date": now, "rank_sorting_type": "rank", "page_size": "500", "order_type": "desc"}
     rank_country = country.lower()
     headers_appannie = {
                 'accept': "application/json, text/plain, */*",
